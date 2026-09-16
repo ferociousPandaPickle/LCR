@@ -15,8 +15,9 @@ load_dotenv()
 league_api_key = os.getenv("LEAGUE_API_KEY")
 
 
-#User will have dropdown to select region (leave for now make it NA only easier)
+#User will have dropdown to select region (in the frontend)
 
+PLATFORMS = ["na1", "br1", "la1", "la2", "kr", "jp1", "euw1", "eun1", "tr1", "ru", "oc1", "ph2", "sg2", "th2", "tw2", "vn2"]
 
 REGION_ROUTING = {
     # AMERICAS
@@ -415,6 +416,7 @@ def main():
     #The vlaues will come from Frontend web
     gameName = input("What is your gameName: ")
     tagLine = input("What is your tagLine: ")
+    print(PLATFORMS)
     platform = input("What is your region (na1, euw1, kr, etc.): ").lower()
 
     urls = get_urls(platform)
