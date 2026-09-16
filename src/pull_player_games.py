@@ -15,8 +15,42 @@ load_dotenv()
 league_api_key = os.getenv("LEAGUE_API_KEY")
 
 
-#User will have dropdown to select region
-base_url = f"https://na1.api.riotgames.com"
+#User will have dropdown to select region (leave for now make it NA only easier)
+
+
+REGION_ROUTING = {
+    # AMERICAS
+    "na1": "americas",
+    "br1": "americas",
+    "la1": "americas",
+    "la2": "americas",
+    # ASIA
+    "kr": "asia",
+    "jp1": "asia",
+    # EUROPE
+    "euw1": "europe",
+    "eun1": "europe",
+    "tr1": "europe",
+    "ru": "europe",
+    # SEA
+    "oc1": "sea",
+    "ph2": "sea",
+    "sg2": "sea",
+    "th2": "sea",
+    "tw2": "sea",
+    "vn2": "sea",
+}
+
+def get_urls(platform: str):
+    platform = platform.lower()
+    if platform not in REGION_ROUTING:
+        raise ValueError(f"Unknown platform: {platform}")
+    routing = REGION_ROUTING[platform]
+    return {
+        "base_url": f"https://{platform}.api.riotgames.com",   # for champion-mastery, league-v4, etc.
+        "match_url": f"https://{routing}.api.riotgames.com",   # for match-v5, account-v1
+    }
+
 ## Instead of calling new TCP connections everytimes here we reuse same connection
 session = requests.Session()
 
@@ -26,8 +60,8 @@ db_key = os.environ["SUPABASE_SECRET_KEY"]
 start_supabase = create_client(db_url,db_key)
 
 # GET PUUID METHOD
-def get_player_puuid(gameName:str, tagLine:str):
-    get_puuid_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}?api_key={league_api_key}"
+def get_player_puuid(gameName:str, tagLine:str, match_url: str):
+    get_puuid_url = f"{match_url}riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}?api_key={league_api_key}"
     response_puuid = session.get(get_puuid_url)
 
     if(response_puuid.status_code != 200):
@@ -50,7 +84,7 @@ def clear_puuid_specific_olddata(puuid_stored:str):
 
 
 #### Champion Mastery
-def get_player_champions_mastery(puuid_stored:str):
+def get_player_champions_mastery(puuid_stored:str, base_url:str):
     get_mastery_url = f"{base_url}/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid_stored}?api_key={league_api_key}"
     # #IT returns an object cannot print directly, so we use .json()
     response_mastery = session.get(get_mastery_url)
@@ -80,8 +114,8 @@ def insert_only_played_mastery(puuid_stored:str, data_mastery:dict):
 
 
 #### Match History
-def get_match_list(puuid_stored: str):
-    get_match_history_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid_stored}/ids?queue=400&start=0&count=100&api_key={league_api_key}"
+def get_match_list(puuid_stored: str, match_count: int, queue_id: int, match_url:str):
+    get_match_history_url = f"{match_url}/lol/match/v5/matches/by-puuid/{puuid_stored}/ids?queue={queue_id}&start=0&count={match_count}&api_key={league_api_key}"
     match_list_response = session.get(get_match_history_url)
     print(f"Status == Player Match List ✅")
     return match_list_response.json()
@@ -337,9 +371,9 @@ def extract_player_stats(player_index: int, participant: dict, match_id: str, pu
     }
 
 
-def batch_lookup(match: str, puuid: str):
+def batch_lookup(match: str, puuid: str, match_url: str):
     
-    get_match_details_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/{match}?api_key={league_api_key}"
+    get_match_details_url = f"{match_url}/lol/match/v5/matches/{match}?api_key={league_api_key}"
     reponse_match_lookup = session.get(get_match_details_url)
     match_data = reponse_match_lookup.json()
 
@@ -359,12 +393,12 @@ def batch_lookup(match: str, puuid: str):
     return extract_player_stats(player_index, match_data["info"]["participants"][player_index], match, puuid)
 
 
-def get_whole_player_matchHistory(batch_size: int, puuid_stored: str, wait_time_batch: int, match_list: list):
+def get_whole_player_matchHistory(batch_size: int, puuid_stored: str, wait_time_batch: int, match_list: list, match_url: str):
     for i in range(0,len(match_list),batch_size):
         batch = match_list[i:i+batch_size]
         batch_insertion_matches = []
         for match in batch:
-            match_data = batch_lookup(match, puuid_stored) ## returns a dict
+            match_data = batch_lookup(match, puuid_stored, match_url) ## returns a dict
             if match_data is not None:
                 batch_insertion_matches.append(match_data)
         response = start_supabase.table("match_history").insert(batch_insertion_matches).execute()
@@ -381,39 +415,39 @@ def main():
     #The vlaues will come from Frontend web
     gameName = input("What is your gameName: ")
     tagLine = input("What is your tagLine: ")
+    platform = input("What is your region (na1, euw1, kr, etc.): ").lower()
+
+    urls = get_urls(platform)
+    base_url = urls["base_url"]
+    match_url = urls["match_url"]
 
     ## Later in future we need to get this automated and we need a way to check if API key was expired
 
-    puuid_stored = get_player_puuid(gameName,tagLine)
+    puuid_stored = get_player_puuid(gameName,tagLine,match_url)
 
     if puuid_stored is None:
-        print(f"⚠️ 429 = api key expired and any other is something wrong with website")
+        print("❌ Could not find that player.")
         sys.exit(1)
     
     clear_puuid_specific_olddata(puuid_stored)
     # TRUNCATE TABLE champion_mastery, match_history RESTART IDENTITY; (Clear all data in tables in SQL Editor Supabase)
 
     #Mastery Table
-    data_mastery = get_player_champions_mastery(puuid_stored)
+    data_mastery = get_player_champions_mastery(puuid_stored, base_url)
     insert_only_played_mastery(puuid_stored, data_mastery)
 
-    #Match History Table
-    match_list = get_match_list(puuid_stored)
+    # Change the values as needed
     batch_size = 20
-    wait_time_batch = 25
-    get_whole_player_matchHistory(batch_size,puuid_stored,wait_time_batch,match_list)
+    wait_time_batch = 25 # it should be 24-26 given the rate limit
+    match_count = 100
+    queue_id = 400 
+
+    #Match History Table
+    match_list = get_match_list(puuid_stored, match_count,queue_id, match_url)
+
+    get_whole_player_matchHistory(batch_size,puuid_stored,wait_time_batch,match_list, match_url)
 
     print("Status == Completed Main✅")
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
