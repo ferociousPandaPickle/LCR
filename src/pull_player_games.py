@@ -62,7 +62,7 @@ start_supabase = create_client(db_url,db_key)
 
 # GET PUUID METHOD
 def get_player_puuid(gameName:str, tagLine:str, match_url: str):
-    get_puuid_url = f"{match_url}riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}?api_key={league_api_key}"
+    get_puuid_url = f"{match_url}/riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}?api_key={league_api_key}"
     response_puuid = session.get(get_puuid_url)
 
     if(response_puuid.status_code != 200):
@@ -418,6 +418,19 @@ def main():
     tagLine = input("What is your tagLine: ")
     print(PLATFORMS)
     platform = input("What is your region (na1, euw1, kr, etc.): ").lower()
+    queue_type = input("What queue type (normal and ranked only)")
+
+    ##Should also ahve a drop down in frontend later
+    if (queue_type == "normal"):
+        queue_id = 400
+
+    if (queue_type == "ranked"):
+        queue_id = 420
+    # Change the values as needed
+    batch_size = 20
+    wait_time_batch = 25 # it should be 24-26 given the rate limit
+    match_count = 100
+
 
     urls = get_urls(platform)
     base_url = urls["base_url"]
@@ -438,11 +451,7 @@ def main():
     data_mastery = get_player_champions_mastery(puuid_stored, base_url)
     insert_only_played_mastery(puuid_stored, data_mastery)
 
-    # Change the values as needed
-    batch_size = 20
-    wait_time_batch = 25 # it should be 24-26 given the rate limit
-    match_count = 100
-    queue_id = 400 
+
 
     #Match History Table
     match_list = get_match_list(puuid_stored, match_count,queue_id, match_url)
