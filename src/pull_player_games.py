@@ -16,7 +16,8 @@ league_api_key = os.getenv("LEAGUE_API_KEY")
 
 #User will have dropdown to select region
 base_url = f"https://na1.api.riotgames.com"
-
+## Instead of calling new TCP connections everytimes here we reuse same connection
+session = requests.Session()
 
 #SUPABASE DB stuff
 db_url = os.environ["SUPABASE_URL"]
@@ -26,7 +27,7 @@ start_supabase = create_client(db_url,db_key)
 # GET PUUID METHOD
 def get_player_puuid(gameName:str, tagLine:str):
     get_puuid_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}?api_key={league_api_key}"
-    response_puuid = requests.get(get_puuid_url)
+    response_puuid = session.get(get_puuid_url)
     response_dict_puuid = response_puuid.json()
     print("Status == Player PUUID ✅")
     return response_dict_puuid["puuid"]
@@ -46,7 +47,7 @@ def clear_puuid_specific_olddata(puuid_stored:str):
 def get_player_champions_mastery(puuid_stored:str):
     get_mastery_url = f"{base_url}/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid_stored}?api_key={league_api_key}"
     # #IT returns an object cannot print directly, so we use .json()
-    response_mastery = requests.get(get_mastery_url)
+    response_mastery = session.get(get_mastery_url)
     print("Status == Player Champions_Mastery: retrieved total list ✅")
     return response_mastery.json()
 
@@ -75,7 +76,7 @@ def insert_only_played_mastery(puuid_stored:str, data_mastery:dict):
 #### Match History
 def get_match_list(puuid_stored: str):
     get_match_history_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid_stored}/ids?queue=400&start=0&count=100&api_key={league_api_key}"
-    match_list_response = requests.get(get_match_history_url)
+    match_list_response = session.get(get_match_history_url)
     print(f"Status == Player Match List ✅")
     return match_list_response.json()
 
@@ -333,7 +334,7 @@ def extract_player_stats(player_index: int, participant: dict, match_id: str, pu
 def batch_lookup(match: str, puuid: str):
     
     get_match_details_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/{match}?api_key={league_api_key}"
-    reponse_match_lookup = requests.get(get_match_details_url)
+    reponse_match_lookup = session.get(get_match_details_url)
     match_data = reponse_match_lookup.json()
 
     #logic to find where player is
