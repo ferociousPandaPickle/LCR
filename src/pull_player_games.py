@@ -1,5 +1,6 @@
 import requests
 import os
+import sys
 import time
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -28,6 +29,11 @@ start_supabase = create_client(db_url,db_key)
 def get_player_puuid(gameName:str, tagLine:str):
     get_puuid_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}?api_key={league_api_key}"
     response_puuid = session.get(get_puuid_url)
+
+    if(response_puuid.status_code != 200):
+        print(f"⚠️ Request failed ({response_puuid.status_code}): {get_puuid_url}")
+        return None
+
     response_dict_puuid = response_puuid.json()
     print("Status == Player PUUID ✅")
     return response_dict_puuid["puuid"]
@@ -379,6 +385,11 @@ def main():
     ## Later in future we need to get this automated and we need a way to check if API key was expired
 
     puuid_stored = get_player_puuid(gameName,tagLine)
+
+    if puuid_stored is None:
+        print(f"⚠️ 429 = api key expired and any other is something wrong with website")
+        sys.exit(1)
+    
     clear_puuid_specific_olddata(puuid_stored)
     # TRUNCATE TABLE champion_mastery, match_history RESTART IDENTITY; (Clear all data in tables in SQL Editor Supabase)
 
