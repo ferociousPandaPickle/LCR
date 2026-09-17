@@ -14,9 +14,7 @@ load_dotenv()
 
 league_api_key = os.getenv("LEAGUE_API_KEY")
 
-
 #User will have dropdown to select region (in the frontend)
-
 PLATFORMS = ["na1", "br1", "la1", "la2", "kr", "jp1", "euw1", "eun1", "tr1", "ru", "oc1", "ph2", "sg2", "th2", "tw2", "vn2"]
 
 REGION_ROUTING = {
