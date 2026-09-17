@@ -82,6 +82,12 @@ def main():
     print(f"Total Match Ids: {len(page_match_ids_set)} ✅")
 
 
+    ## Now when we go into each game like what we gonna do is like get new unique puuids 
+    ## this way like we don't need to like go loop into pages and shit
+    
+    ## look at claude guide
+
+
 
 
     
