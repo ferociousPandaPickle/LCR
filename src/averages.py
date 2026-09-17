@@ -1,6 +1,7 @@
 import requests
 import os
 import sys
+import time
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -39,7 +40,26 @@ def pull_matches(queue: str, division: str, tier: str, page: int):
     return all_puuids_in_page
 
 
+def collect_match_ids(puuid_list: list, batch_size: int, wait_time_batch:int):
+    set_match_ids = set()
+    for i in range(0, len(puuid_list), batch_size):
+        puuid_batch = puuid_list[i:i+batch_size]
+        
+        for puuid in puuid_batch:
+            get_match_id_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?count=100&api_key={league_api_key}"
+            puuid_specific_match_ids = session.get(get_match_id_url)
+            if puuid_specific_match_ids.status_code != 200:
+                print(f"⚠️ Failed for puuid {puuid}: {puuid_specific_match_ids.status_code}")
+                continue
+            data = puuid_specific_match_ids.json()
+            set_match_ids.update(data)
+        batch_number = (i // batch_size) + 1
+        print(f" Completed Batch: {batch_number} ✅")
+        if i + batch_size < len(puuid_list):
+            print(f"Waiting {wait_time_batch}s before next batch...")
+            time.sleep(wait_time_batch)
 
+    return set_match_ids
 
 
 
@@ -48,14 +68,21 @@ def main():
     tier = "I"
     division = "DIAMOND"
     page = 1
+    batch_size = 90
+    wait_time_batch = 120
 
-    player_page_puuid = pull_matches(queue, division, tier, page)
-    if (player_page_puuid is None):
+    puuid_list = pull_matches(queue, division, tier, page)
+    if (puuid_list is None):
         print(f"❌ Cannot Fetch List of Players in {queue} {division} {tier} {page}")
         sys.exit(1)
     # print(*player_page_puuid, sep="\n")
 
-    
+    # Using the list of player puuids from page it will give us 100 match ids per puuid in the list
+    page_match_ids_set = collect_match_ids(puuid_list, batch_size, wait_time_batch)
+    print(f"Total Match Ids: {len(page_match_ids_set)} ✅")
+
+
+
 
     
 
